@@ -26,6 +26,17 @@ void print_matrix(float *, int, int);
 /* Allocation for the kernel in GPU constant memory */
 __constant__ float kernel_c[2 * HALF_WIDTH + 1];
 
+/* CUDA error wrapper */
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
 /* Variables to measure execution time */
 struct timeval start, stop;
 float naive_time, opt_time;
@@ -63,7 +74,6 @@ void compute_on_device(float *gpu_result, float *matrix_c,\
     convolve_rows_kernel_naive<<<dimGrid, dimBlock>>>(d_gpu_result, d_matrix_c, d_kernel, num_cols, num_rows, half_width);
     cudaDeviceSynchronize();
     convolve_columns_kernel_naive<<<dimGrid, dimBlock>>>(d_matrix_c, d_gpu_result, d_kernel, num_cols, num_rows, half_width);
-    cudaDeviceSynchronize();
     gettimeofday(&stop, NULL);
     cudaMemcpy(gpu_result, d_matrix_c, size, cudaMemcpyDeviceToHost);
 
@@ -73,7 +83,9 @@ void compute_on_device(float *gpu_result, float *matrix_c,\
     cudaFree(d_gpu_result);
 
     naive_time = (float) (stop.tv_sec - start.tv_sec + (stop.tv_usec - start.tv_usec)/(float)1000000);
+    
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    
     /* Load device memory */ 
     d_kernel = NULL;
     kernel_width = (2 * half_width + 1) * sizeof(float);
@@ -95,7 +107,6 @@ void compute_on_device(float *gpu_result, float *matrix_c,\
     convolve_rows_kernel_optimized<<<dimGrid, dimBlock>>>(d_gpu_result, d_matrix_c, num_cols, num_rows, half_width);
     cudaDeviceSynchronize();
     convolve_columns_kernel_optimized<<<dimGrid, dimBlock>>>(d_matrix_c, d_gpu_result, num_cols, num_rows, half_width);
-    cudaDeviceSynchronize();
     gettimeofday(&stop, NULL);
     cudaMemcpy(gpu_result, d_matrix_c, size, cudaMemcpyDeviceToHost);
 
